@@ -7,7 +7,7 @@ import { getColumns, resolveTable } from "../db/introspect.js";
  * called "brands" or "brand". We look it up once at startup and every
  * repository uses the resolved name from here.
  */
-export const TABLES = { brands: "brands", locations: "locations" };
+export const TABLES = { brands: "brands", locations: "locations", settings: "app_settings" };
 
 /** Canonical columns. Anything missing is added by the migration. */
 export const COLUMNS = {
@@ -22,6 +22,7 @@ export const COLUMNS = {
 export async function initTables() {
   TABLES.brands = (await resolveTable(["brands", "brand"])) || "brands";
   TABLES.locations = (await resolveTable(["locations", "location"])) || "locations";
+  TABLES.settings = (await resolveTable(["app_settings", "settings"])) || "app_settings";
   return TABLES;
 }
 

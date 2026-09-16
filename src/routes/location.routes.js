@@ -31,3 +31,10 @@ locationRoutes.patch(
   validate({ params: locationIdParam, body: locationStatusSchema }),
   locationController.setStatus
 );
+
+locationRoutes.delete(
+  "/:id",
+  requirePermission("location.delete"),
+  validate({ params: locationIdParam }),
+  locationController.remove
+);

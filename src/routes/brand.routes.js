@@ -11,7 +11,8 @@ brandRoutes.get("/", requirePermission("brand.view"), validate({ query: listBran
 
 brandRoutes.get("/:id", requirePermission("brand.view"), validate({ params: brandIdParam }), brandController.getOne);
 
-brandRoutes.get("/:id/locations",
+brandRoutes.get(
+  "/:id/locations",
   requirePermission("location.view"),
   validate({ params: brandIdParam, query: listLocationsSchema }),
   brandController.listLocations
@@ -31,4 +32,11 @@ brandRoutes.patch(
   requirePermission("brand.update"),
   validate({ params: brandIdParam, body: brandStatusSchema }),
   brandController.setStatus
+);
+
+brandRoutes.delete(
+  "/:id",
+  requirePermission("brand.delete"),
+  validate({ params: brandIdParam }),
+  brandController.remove
 );
