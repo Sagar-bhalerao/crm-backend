@@ -24,6 +24,11 @@ npm run dev              # http://localhost:5000
 | `npm run db:migrate` | Add whatever is missing. Never drops anything, safe to re-run |
 | `npm run db:seed` | Insert sample brands and locations, skipping any code that exists |
 
+## What the API covers
+
+Brands, locations and global settings. Every route declares the permission it will need:
+`brand.view/create/update/delete`, `location.view/create/update/delete`, `settings.view/manage`.
+
 ## Structure
 
 ```

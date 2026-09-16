@@ -25,6 +25,10 @@ export const setStatus = asyncHandler(async (req, res) => {
   sendOk(res, brand, brand.status === "active" ? "Brand activated" : "Brand deactivated");
 });
 
+export const remove = asyncHandler(async (req, res) => {
+  sendOk(res, await brandService.remove(req.params.id), "Brand deleted");
+});
+
 export const listLocations = asyncHandler(async (req, res) => {
   const { items, ...meta } = await locationService.listByBrand(req.params.id, req.query);
   sendOk(res, listPayload(items, meta), "Locations loaded");

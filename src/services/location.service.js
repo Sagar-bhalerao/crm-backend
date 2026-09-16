@@ -47,3 +47,13 @@ export async function setStatus(id, status) {
   if (status === "active") await requireBrand(location.brandId, { mustBeActive: true });
   return locationRepo.update(id, { status });
 }
+
+/**
+ * Permanent delete. Once leads live in PostgreSQL this must also refuse
+ * when the location has leads, the same way a brand refuses with locations.
+ */
+export async function remove(id) {
+  await getById(id);
+  await locationRepo.remove(id);
+  return { id, deleted: true };
+}

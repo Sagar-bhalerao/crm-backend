@@ -2,12 +2,12 @@ import { query } from "../config/database.js";
 import { TABLES } from "../config/tables.js";
 import { parsePagination, parseSort } from "../utils/pagination.js";
 
-const SORTABLE = ["name", "code", "status", "created_at", "updated_at"];
+const SORTABLE = ["brand_name", "code", "status", "created_at", "updated_at"];
 
 /** Shape sent to the frontend: camelCase, with the location count. */
 const toBrand = (row) => ({
   id: row.id,
-  name: row.name,
+  name: row.brand_name, // Map database 'brand_name' to frontend 'name'
   code: row.code,
   description: row.description,
   logoUrl: row.logo_url,
@@ -19,83 +19,139 @@ const toBrand = (row) => ({
 
 export async function findAll({ search, status, sort, page, pageSize }) {
   const { offset, ...paging } = parsePagination({ page, pageSize });
-  const where = [];
+  const whereConditions = [];
   const params = [];
 
+  // 1. Build search filters step-by-step
   if (search) {
     params.push(`%${search}%`);
-    where.push(`(b.name ILIKE $${params.length} OR b.code ILIKE $${params.length})`);
+    whereConditions.push(`(b.brand_name ILIKE $${params.length} OR b.code ILIKE $${params.length})`);
   }
+
   if (status) {
     params.push(status);
-    where.push(`b.status = $${params.length}`);
+    whereConditions.push(`b.status = $${params.length}`);
   }
-  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
-  const { rows: countRows } = await query(`SELECT count(*)::int AS total FROM "${TABLES.brands}" b ${whereSql}`, params);
+  // Combine conditions into a simple WHERE clause string
+  const whereSql = whereConditions.length > 0 
+    ? `WHERE ${whereConditions.join(" AND ")}` 
+    : "";
 
-  const { rows } = await query(
-    `SELECT b.*, (SELECT count(*) FROM "${TABLES.locations}" l WHERE l.brand_id = b.id) AS location_count
-       FROM "${TABLES.brands}" b
-       ${whereSql}
-      ORDER BY ${parseSort(sort, SORTABLE, "name")}
-      LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
-    [...params, paging.pageSize, offset]
-  );
+  // 2. Fetch total count
+  const countSql = `SELECT COUNT(*)::int AS total FROM "brand" b ${whereSql}`;
+  const { rows: countRows } = await query(countSql, params);
 
-  return { items: rows.map(toBrand), total: countRows[0].total, ...paging };
+  // 3. Fetch items with pagination
+  const orderBy = parseSort(sort, SORTABLE, "brand_name");
+  const limitParamIndex = params.length + 1;
+  const offsetParamIndex = params.length + 2;
+
+  const itemsSql = `
+    SELECT 
+      b.*, 
+      (SELECT COUNT(*) FROM "location" l WHERE l.brand_id = b.id) AS location_count
+    FROM "brand" b
+    ${whereSql}
+    ORDER BY ${orderBy}
+    LIMIT $${limitParamIndex} OFFSET $${offsetParamIndex}
+  `;
+
+  const { rows } = await query(itemsSql, [...params, paging.pageSize, offset]);
+
+  return { 
+    items: rows.map(toBrand), 
+    total: countRows[0].total, 
+    ...paging 
+  };
 }
 
 export async function findById(id) {
-  const { rows } = await query(
-    `SELECT b.*, (SELECT count(*) FROM "${TABLES.locations}" l WHERE l.brand_id = b.id) AS location_count
-       FROM "${TABLES.brands}" b WHERE b.id = $1`,
-    [id]
-  );
+  const sql = `
+    SELECT 
+      b.*, 
+      (SELECT COUNT(*) FROM "location" l WHERE l.brand_id = b.id) AS location_count
+    FROM "brand" b 
+    WHERE b.id = $1
+  `;
+  
+  const { rows } = await query(sql, [id]);
   return rows[0] ? toBrand(rows[0]) : null;
 }
 
 /** Code check is case-insensitive; pass excludeId when updating. */
 export async function findByCode(code, excludeId = null) {
-  const { rows} = await query(
-    `SELECT * FROM "${TABLES.brands}" WHERE UPPER(code) = UPPER($1) AND ($2::int IS NULL OR id <> $2) LIMIT 1`,
-    [code, excludeId]
-  );
+  const sql = `
+    SELECT * 
+    FROM "brand" 
+    WHERE UPPER(code) = UPPER($1) 
+      AND ($2::int IS NULL OR id <> $2) 
+    LIMIT 1
+  `;
+  
+  const { rows } = await query(sql, [code, excludeId]);
   return rows[0] ? toBrand(rows[0]) : null;
 }
 
 export async function insert({ name, code, description, logoUrl, status }) {
-  const { rows } = await query(
-    `INSERT INTO "${TABLES.brands}" (name, code, description, logo_url, status)
-     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [name, code, description, logoUrl, status]
-  );
+  const sql = `
+    INSERT INTO "brand" (brand_name, code, description, logo_url, status)
+    VALUES ($1, $2, $3, $4, $5) 
+    RETURNING *
+  `;
+  
+  const { rows } = await query(sql, [name, code, description, logoUrl, status]);
   return toBrand(rows[0]);
 }
 
 /** Updates only the fields present in `changes`. */
 export async function update(id, changes) {
-  const map = { name: "name", code: "code", description: "description", logoUrl: "logo_url", status: "status" };
-  const sets = [];
+  const columnMap = { 
+    name: "brand_name", 
+    code: "code", 
+    description: "description", 
+    logoUrl: "logo_url", 
+    status: "status" 
+  };
+  
+  const setStatements = [];
   const params = [];
 
-  for (const [key, column] of Object.entries(map)) {
+  // Build key-value update strings clearly
+  for (const [key, columnName] of Object.entries(columnMap)) {
     if (key in changes) {
       params.push(changes[key]);
-      sets.push(`${column} = $${params.length}`);
+      setStatements.push(`${columnName} = $${params.length}`);
     }
   }
-  if (sets.length === 0) return findById(id);
+
+  // Nothing to update
+  if (setStatements.length === 0) {
+    return findById(id);
+  }
 
   params.push(id);
-  const { rows } = await query(
-    `UPDATE "${TABLES.brands}" SET ${sets.join(", ")}, updated_at = now() WHERE id = $${params.length} RETURNING *`,
-    params
-  );
+  const idParamIndex = params.length;
+
+  const sql = `
+    UPDATE "brand" 
+    SET ${setStatements.join(", ")}, updated_at = NOW() 
+    WHERE id = $${idParamIndex} 
+    RETURNING *
+  `;
+
+  const { rows } = await query(sql, params);
   return rows[0] ? toBrand(rows[0]) : null;
 }
 
 export async function countLocations(brandId) {
-  const { rows } = await query(`SELECT count(*)::int AS n FROM "${TABLES.locations}" WHERE brand_id = $1`, [brandId]);
+  const sql = `SELECT COUNT(*)::int AS n FROM "location" WHERE brand_id = $1`;
+  const { rows } = await query(sql, [brandId]);
   return rows[0].n;
+}
+
+export async function remove(id) {
+  const sql = `DELETE FROM "brand" WHERE id = $1`;
+  const { rowCount } = await query(sql, [id]);
+  return rowCount > 0;
 }

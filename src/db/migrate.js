@@ -117,6 +117,18 @@ export async function runMigrations() {
   await ensureIndex("locations_code_unique_idx", `CREATE UNIQUE INDEX locations_code_unique_idx ON "${TABLES.locations}" (UPPER(code))`);
   await ensureIndex("locations_brand_id_idx", `CREATE INDEX locations_brand_id_idx ON "${TABLES.locations}" (brand_id)`);
 
+  // ---- settings ----------------------------------------------------------
+  const settingsExisted = await resolveTable(["app_settings"]);
+  if (!settingsExisted) {
+    await query(`
+      CREATE TABLE app_settings (
+        key VARCHAR(60) PRIMARY KEY,
+        value TEXT,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )`);
+    note("created table app_settings");
+  }
+
   // ---- relationship ------------------------------------------------------
   const { rows: fks } = await query(
     `SELECT 1 FROM information_schema.table_constraints

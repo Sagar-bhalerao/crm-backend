@@ -36,5 +36,21 @@ export async function setStatus(id, status) {
   return brandRepo.update(id, { status });
 }
 
+/**
+ * Permanent delete, allowed only when nothing depends on the brand.
+ * Anything with history should be deactivated instead.
+ */
+export async function remove(id) {
+  const brand = await getById(id);
+  const locations = await brandRepo.countLocations(id);
+  if (locations > 0) {
+    throw ApiError.conflict(
+      `${brand.name} still has ${locations} location${locations === 1 ? "" : "s"}. Delete or move them first, or deactivate the brand instead.`
+    );
+  }
+  await brandRepo.remove(id);
+  return { id, deleted: true };
+}
+
 /** Brands that can be chosen when creating new records. */
 export const listActive = () => brandRepo.findAll({ status: "active", pageSize: 100, sort: "name:asc" });

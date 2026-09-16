@@ -107,3 +107,8 @@ export async function update(id, changes) {
   await query(`UPDATE "${TABLES.locations}" SET ${sets.join(", ")}, updated_at = now() WHERE id = $${params.length}`, params);
   return findById(id);
 }
+
+export async function remove(id) {
+  const { rowCount } = await query(`DELETE FROM "${TABLES.locations}" WHERE id = $1`, [id]);
+  return rowCount > 0;
+}
