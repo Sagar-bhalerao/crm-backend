@@ -15,7 +15,7 @@ export const createBrandSchema = z.object({
   code,
   description: optionalText(1000, "Description"),
   logoUrl: optionalText(500, "Logo URL"),
-  status: statusEnum.default("active"),
+  status: statusEnum.default(1),
 });
 
 /** Update allows sending only the fields that changed. */
