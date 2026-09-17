@@ -3,7 +3,10 @@ import { z } from "zod";
 export const idParam = z.object({
   id: z.coerce.number({ message: "Invalid id" }).int("Invalid id").positive("Invalid id"),
 });
-export const statusEnum = z.enum(["active", "inactive"], { message: "Status must be active or inactive" });
+export const statusEnum = z.coerce
+  .number({ message: "Status must be 0 or 1" })
+  .int("Status must be 0 or 1")
+  .refine((v) => v === 0 || v === 1, "Status must be 0 or 1");
 export const statusBody = z.object({ status: statusEnum });
 
 /** Trimmed string that treats "" as "not provided". */

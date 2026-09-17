@@ -2,7 +2,7 @@ import { query } from "../config/database.js";
 import { TABLES } from "../config/tables.js";
 import { parsePagination, parseSort } from "../utils/pagination.js";
 
-const SORTABLE = ["brand_name", "code", "status", "created_at", "updated_at"];
+const SORTABLE = ["brand_name", "code", "status", "created_date", "updated_date"];
 
 /** Shape sent to the frontend: camelCase, with the location count. */
 const toBrand = (row) => ({
@@ -13,8 +13,8 @@ const toBrand = (row) => ({
   logoUrl: row.logo_url,
   status: row.status,
   locationCount: row.location_count != null ? Number(row.location_count) : undefined,
-  createdAt: row.created_at,
-  updatedAt: row.updated_at,
+  createdAt: row.created_date,
+  updatedAt: row.updated_date,
 });
 
 export async function findAll({ search, status, sort, page, pageSize }) {
@@ -95,8 +95,8 @@ export async function findByCode(code, excludeId = null) {
 
 export async function insert({ name, code, description, logoUrl, status }) {
   const sql = `
-    INSERT INTO "brand" (brand_name, code, description, logo_url, status)
-    VALUES ($1, $2, $3, $4, $5) 
+    INSERT INTO "brand" (brand_name, code, description, logo_url, status, created_date, updated_date)
+    VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
     RETURNING *
   `;
   
@@ -135,7 +135,7 @@ export async function update(id, changes) {
 
   const sql = `
     UPDATE "brand" 
-    SET ${setStatements.join(", ")}, updated_at = NOW() 
+    SET ${setStatements.join(", ")}, updated_date = NOW() 
     WHERE id = $${idParamIndex} 
     RETURNING *
   `;
