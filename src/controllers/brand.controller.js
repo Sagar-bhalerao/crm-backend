@@ -22,7 +22,7 @@ export const update = asyncHandler(async (req, res) => {
 
 export const setStatus = asyncHandler(async (req, res) => {
   const brand = await brandService.setStatus(req.params.id, req.body.status);
-  sendOk(res, brand, brand.status === "active" ? "Brand activated" : "Brand deactivated");
+  sendOk(res, brand, brand.status === "1" ? "Brand activated" : "Brand deactivated");
 });
 
 export const remove = asyncHandler(async (req, res) => {

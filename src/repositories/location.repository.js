@@ -1,110 +1,123 @@
 import { query } from "../config/database.js";
-import { TABLES } from "../config/tables.js";
 import { parsePagination, parseSort } from "../utils/pagination.js";
 
-const SORTABLE = ["location_name", "code", "city", "status", "created_at", "updated_at"];
+const SORT_MAP = {
+  name: "l.location_name",
+  brand: "b.brand_name",
+  status: "l.status",
+  createdAt: "l.created_date",
+  updatedAt: "l.updated_date",
+};
 
+/** Shape sent to the frontend: camelCase, brand flattened in. Status stays 1/0. */
 const toLocation = (row) => ({
   id: row.id,
   brandId: row.brand_id,
-  brandName: row.brand_name,
-  brandCode: row.brand_code,
+  brandName: row.brand_name ?? undefined,
   name: row.location_name,
-  code: row.code,
-  city: row.city,
-  state: row.state,
-  address: row.address,
-  pincode: row.pincode,
-  contactNumber: row.contact_number,
-  email: row.email,
   status: row.status,
-  createdAt: row.created_at,
-  updatedAt: row.updated_at,
+  createdAt: row.created_date,
+  updatedAt: row.updated_date,
 });
 
-const selectSql = () =>
-  `SELECT l.*, b.brand_name AS brand_name, b.code AS brand_code
-     FROM "${TABLES.locations}" l
-     LEFT JOIN "${TABLES.brands}" b ON b.id = l.brand_id`;
+const BASE_SELECT = `
+  SELECT l.*, b.brand_name
+  FROM "location" l
+  JOIN "brand" b ON b.id = l.brand_id
+`;
 
-export async function findAll({ search, status, brandId, sort, page, pageSize }) {
+export async function findAll({ search, brandId, status, sort, page, pageSize }) {
   const { offset, ...paging } = parsePagination({ page, pageSize });
-  const where = [];
+  const conditions = [];
   const params = [];
 
   if (search) {
     params.push(`%${search}%`);
-    where.push(`(l.location_name ILIKE $${params.length} OR l.code ILIKE $${params.length} OR l.city ILIKE $${params.length})`);
-  }
-  if (status) {
-    params.push(status);
-    where.push(`l.status = $${params.length}`);
+    conditions.push(`l.location_name ILIKE $${params.length}`);
   }
   if (brandId) {
     params.push(brandId);
-    where.push(`l.brand_id = $${params.length}`);
+    conditions.push(`l.brand_id = $${params.length}`);
   }
-  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  // `status !== undefined`, never `if (status)` — 0 is falsy.
+  if (status !== undefined) {
+    params.push(status);
+    conditions.push(`l.status = $${params.length}`);
+  }
 
-  const { rows: countRows } = await query(
-    `SELECT count(*)::int AS total FROM "location" l ${whereSql}`,
-    params
-  );
+  const whereSql = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
-  const { rows } = await query(
-    `${selectSql()} ${whereSql} ORDER BY ${parseSort(sort, SORTABLE, "location_name")}
-      LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
-    [...params, paging.pageSize, offset]
-  );
+  const countSql = `
+    SELECT COUNT(*)::int AS total
+    FROM "location" l
+    JOIN "brand" b ON b.id = l.brand_id
+    ${whereSql}
+  `;
+  const { rows: countRows } = await query(countSql, params);
+
+  const orderBy = parseSort(sort, SORT_MAP, "name");
+  const itemsSql = `
+    ${BASE_SELECT}
+    ${whereSql}
+    ORDER BY ${orderBy}
+    LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+  `;
+  const { rows } = await query(itemsSql, [...params, paging.pageSize, offset]);
 
   return { items: rows.map(toLocation), total: countRows[0].total, ...paging };
 }
 
 export async function findById(id) {
-  const { rows } = await query(`${selectSql()} WHERE l.id = $1`, [id]);
+  const { rows } = await query(`${BASE_SELECT} WHERE l.id = $1`, [id]);
   return rows[0] ? toLocation(rows[0]) : null;
 }
 
-export async function findByCode(code, excludeId = null) {
-  const { rows } = await query(
-    `SELECT * FROM "location" WHERE UPPER(code) = UPPER($1) AND ($2::int IS NULL OR id <> $2) LIMIT 1`,
-    [code, excludeId]
-  );
+/** Name must be unique inside its brand; pass excludeId when updating. */
+export async function findByName(brandId, name, excludeId = null) {
+  const sql = `
+    SELECT * FROM "location"
+    WHERE brand_id = $1
+      AND LOWER(location_name) = LOWER($2)
+      AND ($3::int IS NULL OR id <> $3)
+    LIMIT 1
+  `;
+  const { rows } = await query(sql, [brandId, name, excludeId]);
   return rows[0] ? toLocation(rows[0]) : null;
 }
 
-export async function insert(data) {
-  const { rows } = await query(
-    `INSERT INTO "location"
-       (brand_id, location_name, status)
-     VALUES ($1, $2, 1) RETURNING id`,
-    [
-      data.brandId, data.name, data.status,
-    ]
-  );
+export async function insert({ brandId, name, status = 1 }) {
+  const sql = `
+    INSERT INTO "location" (brand_id, location_name, status)
+    VALUES ($1, $2, $3)
+    RETURNING id
+  `;
+  const { rows } = await query(sql, [brandId, name, status]);
   return findById(rows[0].id);
 }
 
+/** Updates only the fields present in `changes`. */
 export async function update(id, changes) {
-  const map = {
-    brandId: "brand_id", name: "name", code: "code", city: "city", state: "state",
-    address: "address", pincode: "pincode", contactNumber: "contact_number",
-    email: "email", status: "status",
-  };
-  const sets = [];
+  const columnMap = { brandId: "brand_id", name: "location_name", status: "status" };
+  const setStatements = [];
   const params = [];
 
-  for (const [key, column] of Object.entries(map)) {
+  for (const [key, columnName] of Object.entries(columnMap)) {
     if (key in changes) {
       params.push(changes[key]);
-      sets.push(`${column} = $${params.length}`);
+      setStatements.push(`${columnName} = $${params.length}`);
     }
   }
-  if (sets.length === 0) return findById(id);
+  if (!setStatements.length) return findById(id);
 
   params.push(id);
-  await query(`UPDATE "location" SET ${sets.join(", ")}, updated_date = NOW() WHERE id = $${params.length}`, params);
-  return findById(id);
+  const sql = `
+    UPDATE "location"
+    SET ${setStatements.join(", ")}, updated_date = NOW()
+    WHERE id = $${params.length}
+    RETURNING id
+  `;
+  const { rows } = await query(sql, params);
+  return rows[0] ? findById(rows[0].id) : null;
 }
 
 export async function remove(id) {

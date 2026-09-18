@@ -9,9 +9,9 @@ export function parsePagination({ page, pageSize }, defaultSize = 10, maxSize = 
  * Turns ?sort=name:asc into a SQL fragment, allowing only known columns.
  * Never interpolate a raw sort value into SQL.
  */
-export function parseSort(sort, allowed, fallback) {
+export function parseSort(sort, map, fallbackKey) {
   const [field, direction] = String(sort || "").split(":");
-  const column = allowed.includes(field) ? field : fallback;
-  const dir = direction?.toLowerCase() === "asc" ? "ASC" : direction?.toLowerCase() === "desc" ? "DESC" : "ASC";
+  const column = map[field] || map[fallbackKey];
+  const dir = direction?.toLowerCase() === "desc" ? "DESC" : "ASC";
   return `${column} ${dir}`;
 }

@@ -13,8 +13,14 @@ export const validate = (schemas) => (req, res, next) => {
       const details = result.error.issues.map((i) => ({ field: i.path.join(".") || part, message: i.message }));
       return next(ApiError.badRequest(details[0]?.message || "Check the values you entered.", details));
     }
-    if (part === "query") Object.defineProperty(req, "query", { value: result.data, writable: true });
-    else req[part] = result.data;
+    if (part === "query" || part === "params") {
+      Object.defineProperty(req, part, { value: result.data, writable: true, configurable: true });
+    } else {
+      req[part] = result.data;
+    }
   }
   next();
+  console.log(req.method, req.originalUrl, "params:", req.params, "body:", req.body);
 };
+
+
