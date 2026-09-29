@@ -1,6 +1,6 @@
 import "dotenv/config";
 
-const required = ["DB_NAME", "DB_USER"];
+const required = ["DB_NAME", "DB_USER", "JWT_SECRET"];
 const missing = required.filter((k) => !process.env[k]);
 if (missing.length) {
   console.error(`Missing environment variables: ${missing.join(", ")}. Copy .env.example to .env and fill it in.`);
@@ -20,6 +20,10 @@ export const env = {
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD || "",
     ssl: bool(process.env.DB_SSL) ? { rejectUnauthorized: false } : false,
+  },
+    jwt: {
+    secret: process.env.JWT_SECRET || "",
+    expiresIn: process.env.JWT_EXPIRES_IN || "8h",
   },
   corsOrigins: (process.env.CORS_ORIGINS || "http://localhost:3000").split(",").map((s) => s.trim()).filter(Boolean),
   autoMigrate: bool(process.env.AUTO_MIGRATE, true),
