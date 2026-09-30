@@ -5,6 +5,9 @@ import { ApiError } from "../utils/ApiError.js";
  * parsed value, so controllers always get clean, typed input.
  *
  *   router.post("/", validate({ body: createBrandSchema }), controller.create)
+ *
+ * Request bodies are never logged here: they can carry passwords, SMTP
+ * credentials and WhatsApp auth keys.
  */
 export const validate = (schemas) => (req, res, next) => {
   for (const [part, schema] of Object.entries(schemas)) {
@@ -20,7 +23,4 @@ export const validate = (schemas) => (req, res, next) => {
     }
   }
   next();
-  console.log(req.method, req.originalUrl, "params:", req.params, "body:", req.body);
 };
-
-
