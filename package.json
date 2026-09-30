@@ -2,7 +2,7 @@
   "name": "crm-backend",
   "version": "0.1.0",
   "private": true,
-  "description": "CRM backend: Express + PostgreSQL REST API (brands, locations).",
+  "description": "CRM backend: Express + PostgreSQL REST API (brands, locations, WhatsApp and mail configuration).",
   "type": "module",
   "main": "src/server.js",
   "scripts": {
@@ -10,6 +10,7 @@
     "start": "node src/server.js",
     "db:inspect": "node src/db/inspect.js",
     "db:migrate": "node src/db/migrate.js",
+    "db:migrate:config": "node src/db/migrate-config.js",
     "db:seed": "node src/db/seed.js"
   },
   "engines": {

@@ -21,10 +21,13 @@ export const env = {
     password: process.env.DB_PASSWORD || "",
     ssl: bool(process.env.DB_SSL) ? { rejectUnauthorized: false } : false,
   },
-    jwt: {
+  jwt: {
     secret: process.env.JWT_SECRET || "",
     expiresIn: process.env.JWT_EXPIRES_IN || "8h",
   },
+  // Encrypts SMTP passwords and WhatsApp auth keys. 32 random bytes, base64.
+  // Generate one with: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+  configSecretKey: process.env.CONFIG_SECRET_KEY || "",
   corsOrigins: (process.env.CORS_ORIGINS || "http://localhost:3000").split(",").map((s) => s.trim()).filter(Boolean),
   autoMigrate: bool(process.env.AUTO_MIGRATE, true),
 };
