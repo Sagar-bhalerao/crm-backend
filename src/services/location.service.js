@@ -5,7 +5,7 @@ import { ApiError } from "../utils/ApiError.js";
 async function assertBrandExists(brandId) {
   const brand = await brandRepo.findById(brandId);
   if (!brand) throw ApiError.badRequest("That brand does not exist.");
-  if (brand.status !== "1") throw ApiError.badRequest("That brand is inactive.");
+  if (brand.status != "1") throw ApiError.badRequest("That brand is inactive.");
   return brand;
 }
 
