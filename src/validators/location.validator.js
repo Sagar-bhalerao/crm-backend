@@ -11,6 +11,7 @@ export const createLocationSchema = z.object({
   brandId: z.coerce.number().int().positive("Choose a brand"),
   name,
   status: statusEnum.default("1"),
+  code: z.string().trim().max(20, "Code is too long").optional().nullable(),
 });
 
 export const updateLocationSchema = z
@@ -18,6 +19,7 @@ export const updateLocationSchema = z
     brandId: z.coerce.number().int().positive().optional(),
     name: name.optional(),
     status: statusEnum.optional(),
+    code: z.string().trim().max(20, "Code is too long").optional().nullable(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: "Nothing to update" });
 

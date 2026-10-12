@@ -16,6 +16,7 @@ const toLocation = (row) => ({
   brandName: row.brand_name ?? undefined,
   name: row.location_name,
   status: row.status,
+  code : row.code,
   createdAt: row.created_date,
   updatedAt: row.updated_date,
 });
@@ -85,22 +86,22 @@ export async function findByName(brandId, name, excludeId = null) {
   return rows[0] ? toLocation(rows[0]) : null;
 }
 
-export async function insert({ brandId, name, status = 1 }) {
+export async function insert({ brandId, name, status = 1, code = null }) {
   const sql = `
-    INSERT INTO "location" (brand_id, location_name, status)
-    VALUES ($1, $2, $3)
+    INSERT INTO "location" (brand_id, location_name, status, code)
+    VALUES ($1, $2, $3, $4)
     RETURNING id
   `;
-  const { rows } = await query(sql, [brandId, name, status]);
+  const { rows } = await query(sql, [brandId, name, status, code]);
   return findById(rows[0].id);
 }
 
 /** Updates only the fields present in `changes`. */
 export async function update(id, changes) {
-  const columnMap = { brandId: "brand_id", name: "location_name", status: "status" };
+  const columnMap = { brandId: "brand_id", name: "location_name", status: "status", code: "code" };
   const setStatements = [];
   const params = [];
-
+  
   for (const [key, columnName] of Object.entries(columnMap)) {
     if (key in changes) {
       params.push(changes[key]);
