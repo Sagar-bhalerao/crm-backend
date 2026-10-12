@@ -111,7 +111,7 @@ export async function findForLogin(email) {
 export async function checkLocations(brandId, locationIds) {
   if (!locationIds || locationIds.length === 0) return [];
   const { rows } = await query(
-    `SELECT id, name, brand_id FROM "${TABLES.locations}" WHERE id = ANY($1::int[])`,
+    `SELECT id, location_name, brand_id FROM "location" WHERE id = ANY($1::int[])`,
     [locationIds]
   );
   const missing = locationIds.filter((id) => !rows.some((r) => r.id === id));

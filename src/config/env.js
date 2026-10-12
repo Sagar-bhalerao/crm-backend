@@ -30,4 +30,7 @@ export const env = {
   configSecretKey: process.env.CONFIG_SECRET_KEY || "",
   corsOrigins: (process.env.CORS_ORIGINS || "http://localhost:3000").split(",").map((s) => s.trim()).filter(Boolean),
   autoMigrate: bool(process.env.AUTO_MIGRATE, true),
+  storagePath: process.env.STORAGE_PATH || "./storage",
+  
+  
 };
