@@ -76,7 +76,7 @@ function scopeClause(scope, params) {
   return "1 = 0"; // no scope means no leads, never all of them
 }
 
-export async function findAll({ search, status, locationId, brandId, leadType, assignedTo, fromDate, toDate, sort, page, pageSize }, scope) {
+export async function findAll({ search, status, locationId, brandId, leadType, assignedTo, assigned, fromDate, toDate, sort, page, pageSize }, scope) {
   const { offset, ...paging } = parsePagination({ page, pageSize });
   const params = [];
   const where = [];
@@ -118,6 +118,8 @@ export async function findAll({ search, status, locationId, brandId, leadType, a
     params.push(toDate);
     where.push(`l.created_date < ($${params.length}::date + 1)`);
   }
+  if (assigned === "unassigned") where.push(`l.assigned_to IS NULL`);
+  if (assigned === "assigned") where.push(`l.assigned_to IS NOT NULL`);
 
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
@@ -178,22 +180,22 @@ export async function insert(data) {
       `INSERT INTO leads
          (lead_code, brand_id, location_id, first_name, last_name, mobile, email,
           lead_type, source, event_date, event_time_slot, guests, kids, requirements, remarks,
-          company_name, company_gstin, assigned_to, assigned_at, status, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+          company_name, company_gstin, status, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
        RETURNING id`,
       [
         leadCode, data.brandId, data.locationId, data.firstName, data.lastName, data.mobile, data.email,
         data.leadType, data.source, data.eventDate, data.eventTimeSlot, data.guests, data.kids,
         data.requirements, data.remarks, data.companyName, data.companyGstin,
-        data.assignedTo, data.assignedTo ? new Date() : null, data.status, data.createdBy,
+        data.status, data.createdBy,
       ]
     );
 
     const id = rows[0].id;
     await addActivity(client, id, "created", `Lead ${leadCode} created from ${data.source}`, data.createdBy);
-    if (data.assignedTo) {
-      await addActivity(client, id, "assigned", "Assigned to the sales team", data.createdBy);
-    }
+    // if (data.assignedTo) {
+    //   await addActivity(client, id, "assigned", "Assigned to the sales team", data.createdBy);
+    // }
     return id;
   }).then(findById);
 }

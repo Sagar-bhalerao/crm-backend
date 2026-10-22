@@ -42,15 +42,15 @@ export const createLeadSchema = z.object({
   remarks: optionalText(1000, "Remarks"),
   companyName: optionalText(200, "Company name"),
   companyGstin: optionalText(20, "GSTIN"),
-  assignedTo: z.coerce.number().int().positive().optional().nullable(),
+  
 });
 
 /** The website form: no assignment, and the source is fixed. */
-export const publicLeadSchema = createLeadSchema.omit({ assignedTo: true, source: true });
+export const publicLeadSchema = createLeadSchema.omit({ source: true });
 
 export const updateLeadSchema = createLeadSchema
   .partial()
-  .omit({ assignedTo: true })
+  
   .refine((v) => Object.keys(v).length > 0, { message: "Nothing to update" });
 
 export const listLeadsSchema = z.object({
@@ -65,6 +65,7 @@ export const listLeadsSchema = z.object({
   fromDate: z.string().trim().optional(),
   toDate: z.string().trim().optional(),
   sort: z.string().trim().optional(),
+  assigned: z.preprocess((v) => v || undefined, z.enum(["unassigned", "assigned"]).optional()),
 });
 
 export const statusSchema = z.object({

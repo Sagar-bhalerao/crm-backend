@@ -19,6 +19,11 @@ const toQuotation = (row) => ({
   version: row.version,
   subtotal: Number(row.subtotal),
   discount: Number(row.discount),
+  discountType: row.discount_type || "rupees",
+  // What the discount actually came to, so the PDF and screens agree
+  discountAmount: row.discount_type === "percentage"
+    ? Math.round(Number(row.subtotal) * Number(row.discount)) / 100
+    : Number(row.discount),
   taxRate: Number(row.tax_rate),
   taxAmount: Number(row.tax_amount),
   total: Number(row.total),
@@ -69,12 +74,22 @@ export async function findCurrent(leadId) {
 }
 
 /** Totals are worked out here, never trusted from the browser. */
-function calculate(items, discount, taxRate) {
+/**
+ * Totals are worked out here, never trusted from the browser.
+ * A percentage discount is taken off the subtotal; rupees is a flat amount.
+ */
+function calculate(items, discount, discountType, taxRate) {
   const subtotal = items.reduce((sum, i) => sum + Number(i.qty) * Number(i.rate), 0);
-  const afterDiscount = Math.max(0, subtotal - Number(discount || 0));
+
+  const value = Number(discount || 0);
+  const discountAmount = discountType === "percentage" ? (subtotal * value) / 100 : value;
+
+  const afterDiscount = Math.max(0, subtotal - discountAmount);
   const taxAmount = (afterDiscount * Number(taxRate || 0)) / 100;
+
   return {
     subtotal: round(subtotal),
+    discountAmount: round(discountAmount),
     taxAmount: round(taxAmount),
     total: round(afterDiscount + taxAmount),
   };
@@ -109,16 +124,16 @@ export async function insertVersion(leadId, data, userId) {
       [leadId]
     );
 
-    const totals = calculate(data.items, data.discount, data.taxRate);
+    const totals = calculate(data.items, data.discount, data.discountType, data.taxRate);
 
     const { rows } = await client.query(
       `INSERT INTO quotations
-         (lead_id, quotation_code, version, subtotal, discount, tax_rate, tax_amount, total,
+         (lead_id, quotation_code, version, subtotal, discount, discount_type, tax_rate, tax_amount, total,
           valid_until, notes, status, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'draft',$11) RETURNING id`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'draft',$12) RETURNING id`,
       [
-        leadId, code, version, totals.subtotal, data.discount || 0, data.taxRate,
-        totals.taxAmount, totals.total, data.validUntil, data.notes, userId,
+        leadId, code, version, totals.subtotal, data.discount || 0, data.discountType || "rupees",
+        data.taxRate, totals.taxAmount, totals.total, data.validUntil, data.notes, userId,
       ]
     );
 

@@ -39,14 +39,15 @@ export async function create(input, user = null) {
   if (!location) throw ApiError.badRequest("Choose a location that exists.");
   if (location.status !== 1) throw ApiError.badRequest(`${location.name} is inactive.`);
 
-  // Unassigned leads go to the Sales POC at that location with the least on
-  let assignedTo = input.assignedTo || null;
-  if (!assignedTo) assignedTo = await leadRepo.findLeastBusyPoc(input.locationId);
+  // only someone allowed to assign may set the while creating
+  const mayAssign = user?.permissions.includes("lead.assign");
+  const assignedTo = mayAssign && input.assignedTo ? input.assignedTo : null;
+  
 
   return leadRepo.insert({
     ...input,
     brandId: location.brandId,
-    assignedTo,
+    assignedTo: null,
     status: assignedTo ? "assigned" : "new",
     createdBy: user?.id || null,
   });
