@@ -4,6 +4,8 @@ import * as leadService from "./lead.service.js";
 import { generateQuotationPdf } from "./quotationPdf.js";
 import { ApiError } from "../utils/ApiError.js";
 import { fileExists } from "../utils/storage.js";
+import { sendLeadEmail } from "./emailSender.js";
+import { buildQuotationEmail } from "./quotationEmail.js";
 
 /** Visibility follows the lead, so there is one rule, not two. */
 export async function listForLead(leadId, user) {
@@ -72,12 +74,33 @@ export async function getPdf(id, user) {
  * Marks the quotation shared and moves the lead to the Quotation stage.
  * Sending the message itself comes next; this records that it went out.
  */
+/**
+ * Emails the quotation with its PDF attached, marks it shared and moves the
+ * lead forward. A failed send leaves the quotation as a draft, so Share can
+ * simply be pressed again once the problem is fixed.
+ */
 export async function share(id, user) {
   const quotation = await getById(id, user);
   if (!quotation.pdfPath) throw ApiError.badRequest("Generate the PDF before sharing.");
   if (quotation.status === "superseded") throw ApiError.badRequest("This version has been replaced by a newer one.");
 
   const lead = await leadRepo.findById(quotation.leadId);
+  const context = await quotationRepo.findContext(quotation.leadId);
+  const { subject, body } = buildQuotationEmail(lead, quotation, context);
+
+  try {
+    await sendLeadEmail(lead, {
+      messageType: "quotation",
+      subject,
+      body,
+      attachments: [{ path: quotation.pdfPath, filename: `${quotation.quotationCode}-v${quotation.version}.pdf` }],
+      userId: user.id,
+    });
+  } catch (err) {
+    // The attempt is already logged against the lead, so just surface why
+    throw ApiError.badRequest(err.message);
+  }
+
   const shared = await quotationRepo.markShared(id);
 
   // Only move the lead forward; never drag it back from a later stage
@@ -86,8 +109,8 @@ export async function share(id, user) {
   }
 
   await leadRepo.addActivity(
-    null, quotation.leadId, "quotation",
-    `Quotation ${quotation.quotationCode} v${quotation.version} shared with the customer`,
+    null, quotation.leadId, "message_sent",
+    `Quotation ${quotation.quotationCode} v${quotation.version} emailed to ${lead.email}`,
     user.id
   );
 

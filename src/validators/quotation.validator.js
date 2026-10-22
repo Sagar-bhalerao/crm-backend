@@ -13,6 +13,7 @@ export const createQuotationSchema = z.object({
   taxRate: z.coerce.number().min(0).max(100).default(18),
   validUntil: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.coerce.date().nullable()),
   notes: optionalText(2000, "Notes"),
+  discountType: z.enum(["rupees", "percentage"], { message: "Choose a discount type" }).default("rupees"),
 });
 
 export const quotationStatusSchema = z.object({

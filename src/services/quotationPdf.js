@@ -115,7 +115,9 @@ function buildHtml(quotation, context) {
 
   <div class="totals">
     <div><span>Subtotal</span><span>${money(quotation.subtotal)}</span></div>
-    ${quotation.discount > 0 ? `<div><span>Discount</span><span>− ${money(quotation.discount)}</span></div>` : ""}
+        ${quotation.discountAmount > 0
+      ? `<div><span>Discount${quotation.discountType === "percentage" ? ` (${quotation.discount}%)` : ""}</span><span>− ${money(quotation.discountAmount)}</span></div>`
+      : ""}
     <div><span>GST (${quotation.taxRate}%)</span><span>${money(quotation.taxAmount)}</span></div>
     <div class="grand"><span>Total</span><span>${money(quotation.total)}</span></div>
   </div>
