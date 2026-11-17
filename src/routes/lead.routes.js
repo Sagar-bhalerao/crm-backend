@@ -7,11 +7,14 @@ import {
   listLeadsSchema, publicLeadSchema, statusSchema, updateLeadSchema,
 } from "../validators/lead.validator.js";
 import { leadQuotationRoutes } from "./quotation.routes.js";
+import { leadInvoiceRoutes } from "./invoice.routes.js";
 
 export const leadRoutes = Router();
 
 leadRoutes.get("/options", requirePermission("lead.view"), leadController.options);
+leadRoutes.get("/followups", requirePermission("lead.view"), leadController.followups);
 leadRoutes.get("/summary", requirePermission("lead.view"), leadController.summary);
+leadRoutes.get("/dashboard", requirePermission("lead.view"), leadController.dashboard);
 
 leadRoutes.get("/", requirePermission("lead.view"), validate({ query: listLeadsSchema }), leadController.list);
 
@@ -30,6 +33,7 @@ leadRoutes.post("/:id/followups", requirePermission("followup.create"), validate
 leadRoutes.delete("/:id", requirePermission("lead.delete"), validate({ params: leadIdParam }), leadController.remove);
 
 leadRoutes.use("/:leadId/quotations", leadQuotationRoutes);
+leadRoutes.use("/:leadId/invoices", leadInvoiceRoutes);
 
 /** The website enquiry form. Mounted outside the token check. */
 export const publicLeadRoutes = Router();

@@ -64,6 +64,7 @@ export async function findAll({ locationId, leadType, category, status, search }
       ORDER BY r.category, r.sort_order, r.name, r.priority DESC`,
     params
   );
+  console.log("findAll rate cards", rows);
   return rows.map(toRateCard);
 }
 

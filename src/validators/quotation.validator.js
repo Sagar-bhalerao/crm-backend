@@ -22,3 +22,13 @@ export const quotationStatusSchema = z.object({
 
 export const quotationIdParam = idParam;
 export const leadIdParam = z.object({ leadId: z.coerce.number().int().positive("Invalid lead") });
+
+export const listQuotationsSchema = z.object({
+  search: z.string().trim().max(100).optional(),
+  status: z.enum(["draft", "shared", "accepted", "rejected", "superseded"]).optional(),
+  locationId: z.coerce.number().int().positive().optional(),
+  versions: z.enum(["latest", "all"]).optional(),
+  sort: z.string().optional(),
+  page: z.coerce.number().int().min(1).optional(),
+  pageSize: z.coerce.number().int().min(1).max(100).optional(),
+});

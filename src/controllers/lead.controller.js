@@ -2,6 +2,7 @@ import { FOLLOWUP_CHANNELS, FOLLOWUP_OUTCOMES, LEAD_SOURCES, LEAD_STATUSES, LEAD
 import * as leadService from "../services/lead.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { listPayload, sendCreated, sendOk } from "../utils/response.js";
+import * as dashboardService from "../services/dashboard.service.js";
 
 /** Dropdown values for the lead screens. */
 export const options = asyncHandler(async (req, res) => {
@@ -10,6 +11,10 @@ export const options = asyncHandler(async (req, res) => {
     { statuses: LEAD_STATUSES, types: LEAD_TYPES, sources: LEAD_SOURCES, timeSlots: TIME_SLOTS, followupChannels: FOLLOWUP_CHANNELS, followupOutcomes: FOLLOWUP_OUTCOMES },
     "Options loaded"
   );
+});
+
+export const dashboard = asyncHandler(async (req, res) => {
+  sendOk(res, await dashboardService.getDashboard(req.user), "Dashboard loaded");
 });
 
 export const list = asyncHandler(async (req, res) => {
@@ -49,6 +54,10 @@ export const addFollowup = asyncHandler(async (req, res) => {
 
 export const summary = asyncHandler(async (req, res) => {
   sendOk(res, await leadService.getSummary(req.user), "Summary loaded");
+});
+
+export const followups = asyncHandler(async (req, res) => {
+  sendOk(res, await leadService.listFollowups(req.user), "Follow-ups loaded");
 });
 
 export const remove = asyncHandler(async (req, res) => {
