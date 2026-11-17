@@ -2,11 +2,16 @@ import * as quotationService from "../services/quotation.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { readFile } from "../utils/storage.js";
 import { sendCreated, sendOk } from "../utils/response.js";
+import { listPayload } from "../utils/response.js";
 
 export const listForLead = asyncHandler(async (req, res) => {
   sendOk(res, await quotationService.listForLead(req.params.leadId, req.user), "Quotations loaded");
 });
 
+export const list = asyncHandler(async (req, res) => {
+  const { items, ...meta } = await quotationService.list(req.query, req.user);
+  sendOk(res, listPayload(items, meta), "Quotations loaded");
+});
 export const getOne = asyncHandler(async (req, res) => {
   sendOk(res, await quotationService.getById(req.params.id, req.user), "Quotation loaded");
 });

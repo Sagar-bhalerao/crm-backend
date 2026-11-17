@@ -13,6 +13,9 @@ export async function listForLead(leadId, user) {
   return quotationRepo.findByLead(leadId);
 }
 
+/** Visibility follows the lead, same rule as the Leads list. */
+export const list = (query, user) => quotationRepo.findAll(query, leadService.scopeFor(user));
+
 export async function getById(id, user) {
   const quotation = await quotationRepo.findById(id);
   if (!quotation) throw ApiError.notFound("That quotation does not exist.");

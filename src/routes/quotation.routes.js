@@ -3,10 +3,11 @@ import * as quotationController from "../controllers/quotation.controller.js";
 import { requirePermission } from "../middlewares/auth.middleware.js";
 import { validate } from "../middlewares/validation.middleware.js";
 import {
-  createQuotationSchema, leadIdParam, quotationIdParam, quotationStatusSchema,
+  createQuotationSchema, leadIdParam, listQuotationsSchema, quotationIdParam, quotationStatusSchema,
 } from "../validators/quotation.validator.js";
 
 export const quotationRoutes = Router();
+quotationRoutes.get("/", requirePermission("quotation.view"), validate({ query: listQuotationsSchema }), quotationController.list);
 
 quotationRoutes.get("/:id", requirePermission("quotation.view"), validate({ params: quotationIdParam }), quotationController.getOne);
 

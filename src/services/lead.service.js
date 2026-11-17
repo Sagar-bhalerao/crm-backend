@@ -2,6 +2,7 @@ import { getStatus, LEAD_STATUSES } from "../config/leads.js";
 import * as leadRepo from "../repositories/lead.repository.js";
 import * as locationRepo from "../repositories/location.repository.js";
 import { ApiError } from "../utils/ApiError.js";
+import * as invoiceRepo from "../repositories/invoice.repository.js";
 
 /**
  * What this user is allowed to see, from their permissions:
@@ -17,6 +18,7 @@ export function scopeFor(user) {
 }
 
 export const list = (query, user) => leadRepo.findAll(query, scopeFor(user));
+export const listFollowups = (user) => leadRepo.findScheduledFollowups(scopeFor(user));
 
 export async function getById(id, user) {
   const lead = await leadRepo.findById(id);
@@ -42,7 +44,7 @@ export async function create(input, user = null) {
   // only someone allowed to assign may set the while creating
   const mayAssign = user?.permissions.includes("lead.assign");
   const assignedTo = mayAssign && input.assignedTo ? input.assignedTo : null;
-  
+
 
   return leadRepo.insert({
     ...input,
@@ -83,6 +85,14 @@ export async function changeStatus(id, { status, reason }, user) {
   }
   if (status === "not_interested" && !reason) {
     throw ApiError.badRequest("Give a reason when marking a lead as not interested.");
+  }
+
+  // A booking is only real once the advance is in
+  if (status === "finalized") {
+    const invoice = await invoiceRepo.findActive(id);
+    if (invoice?.status !== "paid") {
+      throw ApiError.badRequest("Record the advance payment on the proforma invoice before finalizing.");
+    }
   }
 
   const updated = await leadRepo.update(id, {

@@ -1,4 +1,6 @@
 import { query, withTransaction } from "../config/database.js";
+import { parsePagination, parseSort } from "../utils/pagination.js";
+import { scopeClause } from "./lead.repository.js";
 
 
 const toItem = (row) => ({
@@ -52,6 +54,75 @@ export async function findByLead(leadId) {
   return rows.map(toQuotation);
 }
 
+const LIST_SORT = { createdAt: "q.created_date", eventDate: "l.event_date", total: "q.total" };
+
+/**
+ * Quotations across every lead the user can see. Only the latest version
+ * per lead unless versions = "all", or each revised lead appears several times.
+ */
+export async function findAll({ search, status, locationId, versions, sort, page, pageSize }, scope) {
+  const { offset, ...paging } = parsePagination({ page, pageSize });
+  const params = [];
+  const where = [];
+
+  const scoped = scopeClause(scope, params);
+  if (scoped) where.push(scoped);
+
+  if (versions !== "all") {
+    where.push(`q.version = (SELECT max(version) FROM quotations x WHERE x.lead_id = q.lead_id)`);
+  }
+  if (status) {
+    params.push(status);
+    where.push(`q.status = $${params.length}`);
+  }
+  if (locationId) {
+    params.push(locationId);
+    where.push(`l.location_id = $${params.length}`);
+  }
+  if (search) {
+    params.push(`%${search}%`);
+    where.push(`(q.quotation_code ILIKE $${params.length} OR l.lead_code ILIKE $${params.length}
+                 OR l.first_name ILIKE $${params.length} OR l.last_name ILIKE $${params.length}
+                 OR l.mobile ILIKE $${params.length})`);
+  }
+
+  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
+  const { rows: countRows } = await query(
+    `SELECT count(*)::int AS total FROM quotations q JOIN leads l ON l.id = q.lead_id ${whereSql}`,
+    params
+  );
+
+  const { rows } = await query(
+    `SELECT q.*, l.lead_code, l.event_date, l.guests,
+            TRIM(CONCAT(l.first_name, ' ', COALESCE(l.last_name, ''))) AS customer_name,
+            loc.location_name,
+            TRIM(CONCAT(u.first_name, ' ', COALESCE(u.last_name, ''))) AS created_by_name,
+            TRIM(CONCAT(a.first_name, ' ', COALESCE(a.last_name, ''))) AS assigned_to_name
+       FROM quotations q
+       JOIN leads l ON l.id = q.lead_id
+       LEFT JOIN "location" loc ON loc.id = l.location_id
+       LEFT JOIN users u ON u.id = q.created_by
+       LEFT JOIN users a ON a.id = l.assigned_to
+       ${whereSql}
+      ORDER BY ${parseSort(sort, LIST_SORT, "createdAt")}, q.id DESC
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+    [...params, paging.pageSize, offset]
+  );
+  
+  return {
+    items: rows.map((r) => ({
+      ...toQuotation(r),
+      locationName: r.location_name,
+      eventDate: r.event_date,
+      guests: r.guests,
+      assignedToName: r.assigned_to_name || null,
+    })),
+    total: countRows[0].total,
+    ...paging,
+  };
+}
+
 export async function findById(id) {
   const { rows } = await query(`${SELECT()} WHERE q.id = $1`, [id]);
   if (!rows[0]) return null;
@@ -78,7 +149,7 @@ export async function findCurrent(leadId) {
  * Totals are worked out here, never trusted from the browser.
  * A percentage discount is taken off the subtotal; rupees is a flat amount.
  */
-function calculate(items, discount, discountType, taxRate) {
+ export function calculate(items, discount, discountType, taxRate) {
   const subtotal = items.reduce((sum, i) => sum + Number(i.qty) * Number(i.rate), 0);
 
   const value = Number(discount || 0);
@@ -95,7 +166,7 @@ function calculate(items, discount, discountType, taxRate) {
   };
 }
 
-const round = (n) => Math.round(n * 100) / 100;
+export const round = (n) => Math.round(n * 100) / 100;
 
 /**
  * Creates the next version for a lead. Any earlier version that is still
@@ -181,6 +252,7 @@ export async function findContext(leadId) {
             loc.location_name AS location_name, loc.address AS location_address,
             loc.city AS location_city, loc.state AS location_state,
             loc.contact_number AS location_phone, loc.email AS location_email,
+             loc.legal_name AS location_legal_name, loc.gstin AS location_gstin,
             TRIM(CONCAT(u.first_name, ' ', COALESCE(u.last_name, ''))) AS poc_name,
             u.mobile AS poc_mobile, u.email AS poc_email
        FROM leads l

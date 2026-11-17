@@ -1,6 +1,7 @@
 import { query, withTransaction } from "../config/database.js";
 import { TABLES } from "../config/tables.js";
 import { parsePagination, parseSort } from "../utils/pagination.js";
+ 
 
 const SORTABLE = ["created_date", "event_date", "status", "first_name", "next_followup_at"];
 
@@ -62,7 +63,7 @@ const SELECT = () => `
  *   { locationIds: [1, 2] }        leads at those locations
  *   { assignedTo: 5 }              only their own
  */
-function scopeClause(scope, params) {
+export function scopeClause(scope, params) {
   if (!scope || scope.all) return null;
 
   if (scope.locationIds?.length) {
@@ -296,6 +297,48 @@ export async function listFollowups(leadId) {
     nextAt: r.next_at,
     createdAt: r.created_at,
     userName: r.user_name,
+  }));
+}
+
+/**
+ * Open leads with a follow-up scheduled, soonest first, each with the last
+ * follow-up logged so the list shows where things were left.
+ */
+export async function findScheduledFollowups(scope) {
+  const params = [];
+  const where = [
+    `l.next_followup_at IS NOT NULL`,
+    `l.status NOT IN ('finalized', 'not_interested', 'cancelled')`,
+  ];
+  const scoped = scopeClause(scope, params);
+  if (scoped) where.push(scoped);
+
+  const { rows } = await query(
+    `SELECT l.*,
+            loc.location_name AS location_name,
+            TRIM(CONCAT(a.first_name, ' ', COALESCE(a.last_name, ''))) AS assigned_to_name,
+            f.channel AS last_channel, f.outcome AS last_outcome, f.note AS last_note, f.created_at AS last_at
+       FROM leads l
+       LEFT JOIN "location" loc ON loc.id = l.location_id
+       LEFT JOIN users a ON a.id = l.assigned_to
+       LEFT JOIN LATERAL (
+         SELECT channel, outcome, note, created_at
+           FROM lead_followups
+          WHERE lead_id = l.id
+          ORDER BY created_at DESC
+          LIMIT 1
+       ) f ON true
+      WHERE ${where.join(" AND ")}
+      ORDER BY l.next_followup_at ASC
+      LIMIT 500`,
+    params
+  );
+
+  return rows.map((r) => ({
+    ...toLead(r),
+    lastFollowup: r.last_at
+      ? { channel: r.last_channel, outcome: r.last_outcome, note: r.last_note, createdAt: r.last_at }
+      : null,
   }));
 }
 
