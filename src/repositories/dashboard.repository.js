@@ -37,7 +37,7 @@ const deals = (whereSql) => `
     ) pi ON true
     LEFT JOIN LATERAL (
       SELECT total, status, shared_at FROM quotations
-       WHERE lead_id = l.id AND status <> 'superseded'
+      WHERE lead_id = l.id AND status NOT IN ('cancelled', 'superseded')
        ORDER BY version DESC
        LIMIT 1
     ) q ON true

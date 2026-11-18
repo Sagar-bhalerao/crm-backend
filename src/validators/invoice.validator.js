@@ -67,7 +67,7 @@ export const cancelSchema = z.object({
 
 export const listInvoicesSchema = z.object({
   search: z.string().trim().max(100).optional(),
-  status: z.enum(["draft", "sent", "paid", "cancelled"]).optional(),
+  status: z.enum(["draft", "sent", "paid", "cancelled", "superseded"]).optional(),
   locationId: z.coerce.number().int().positive().optional(),
   sort: z.string().optional(),
   page: z.coerce.number().int().min(1).optional(),

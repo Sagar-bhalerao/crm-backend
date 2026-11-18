@@ -109,7 +109,7 @@ export async function findAll({ search, status, locationId, versions, sort, page
       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
     [...params, paging.pageSize, offset]
   );
-  
+
   return {
     items: rows.map((r) => ({
       ...toQuotation(r),
@@ -149,7 +149,7 @@ export async function findCurrent(leadId) {
  * Totals are worked out here, never trusted from the browser.
  * A percentage discount is taken off the subtotal; rupees is a flat amount.
  */
- export function calculate(items, discount, discountType, taxRate) {
+export function calculate(items, discount, discountType, taxRate) {
   const subtotal = items.reduce((sum, i) => sum + Number(i.qty) * Number(i.rate), 0);
 
   const value = Number(discount || 0);
@@ -232,9 +232,13 @@ export async function setPdfPath(id, pdfPath) {
   return findById(id);
 }
 
+// Only a draft becomes "shared": re-sending an older or decided version keeps its status
 export async function markShared(id) {
   await query(
-    `UPDATE quotations SET status = 'shared', shared_at = now(), updated_date = now() WHERE id = $1`,
+    `UPDATE quotations
+        SET status = CASE WHEN status = 'draft' THEN 'shared' ELSE status END,
+            shared_at = now(), updated_date = now()
+      WHERE id = $1`,
     [id]
   );
   return findById(id);
