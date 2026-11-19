@@ -32,8 +32,10 @@ export const createLeadSchema = z.object({
   lastName: optionalText(150, "Last name"),
   mobile,
   email,
-  leadType: z.enum(LEAD_TYPE_KEYS, { message: "Choose a lead type" }),
+  leadType: z.string().trim().min(2, "Choose a lead type").max(100),
   source: z.enum(LEAD_SOURCES).default("phone"),
+  // destination is optional like theme park or water park if blank send emty string to db 
+  destination : z.string().trim().max(100).optional().or(z.literal("")).transform((v) => v || null),
   eventDate: optionalDate,
   eventTimeSlot: optionalText(40, "Time slot"),
   guests: optionalNumber,

@@ -45,7 +45,7 @@ export async function create(input, user = null) {
   const mayAssign = user?.permissions.includes("lead.assign");
   const assignedTo = mayAssign && input.assignedTo ? input.assignedTo : null;
 
-
+  
   return leadRepo.insert({
     ...input,
     brandId: location.brandId,
