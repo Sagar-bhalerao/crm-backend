@@ -1,9 +1,16 @@
 import { query, withTransaction } from "../config/database.js";
 import { TABLES } from "../config/tables.js";
 import { parsePagination, parseSort } from "../utils/pagination.js";
- 
 
-const SORTABLE = ["created_date", "event_date", "status", "first_name", "next_followup_at"];
+
+// Sort keys the Leads list sends ("created_date:desc"), mapped to real columns
+const SORTABLE = {
+  created_date: "l.created_date",
+  event_date: "l.event_date",
+  status: "l.status",
+  first_name: "l.first_name",
+  next_followup_at: "l.next_followup_at",
+};
 
 const toLead = (row) => ({
   id: row.id,
@@ -126,14 +133,12 @@ export async function findAll({ search, status, locationId, brandId, leadType, a
 
   const { rows: countRows } = await query(`SELECT count(*)::int AS total FROM leads l ${whereSql}`, params);
 
-  // const { rows } = await query(
-  //   `${SELECT()} ${whereSql}
-  //     ORDER BY ${parseSort(sort, SORTABLE, "created_date")} DESC NULLS LAST
-  //     LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
-  //   [...params, paging.pageSize, offset]
-  // );
   const { rows } = await query(
-    `${SELECT()}`);
+    `${SELECT()} ${whereSql}
+      ORDER BY ${parseSort(sort, SORTABLE, "created_date")} NULLS LAST, l.id DESC
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+    [...params, paging.pageSize, offset]
+  );
 
   return { items: rows.map(toLead), total: countRows[0].total, ...paging };
 }
