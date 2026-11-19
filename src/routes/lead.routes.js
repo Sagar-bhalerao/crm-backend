@@ -37,4 +37,4 @@ leadRoutes.use("/:leadId/invoices", leadInvoiceRoutes);
 
 /** The website enquiry form. Mounted outside the token check. */
 export const publicLeadRoutes = Router();
-publicLeadRoutes.post("/enquiries", validate({ body: publicLeadSchema }), leadController.createPublic);
+publicLeadRoutes.post("/", validate({ body: publicLeadSchema }), leadController.createPublic);

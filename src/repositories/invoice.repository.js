@@ -91,7 +91,7 @@ export async function findAll({ search, status, locationId, sort, page, pageSize
     params.push(status);
     where.push(`pi.status = $${params.length}`);
   } else {
-    where.push(`pi.status <> 'cancelled'`);
+    where.push(`pi.status NOT IN ('cancelled', 'superseded')`);
   }
   if (locationId) {
     params.push(locationId);
@@ -156,7 +156,8 @@ export async function findById(id) {
 /** The one invoice in play for a lead: anything not cancelled. */
 export async function findActive(leadId) {
   const { rows } = await query(
-    `SELECT id FROM proforma_invoices WHERE lead_id = $1 AND status <> 'cancelled' LIMIT 1`,
+    `SELECT id FROM proforma_invoices
+      WHERE lead_id = $1 AND status NOT IN ('cancelled', 'superseded') LIMIT 1`,
     [leadId]
   );
   return rows[0] ? findById(rows[0].id) : null;
@@ -189,6 +190,13 @@ export async function insertFromQuotation(leadId, quotationId, data, userId) {
       [leadId]
     );
 
+    // A new version replaces the one in play, as with quotations. The service
+    // has already refused if that one is paid.
+    await client.query(
+      `UPDATE proforma_invoices SET status = 'superseded', updated_date = now()
+        WHERE lead_id = $1 AND status IN ('draft', 'sent')`,
+      [leadId]
+    );
     // Cancelled invoices keep their numbers, so a reissue gets a suffix
     const base = `PI-${lead[0].lead_code}`;
     const invoiceNumber = count[0].n === 0 ? base : `${base}-${count[0].n + 1}`;
@@ -284,9 +292,13 @@ export async function setPdfPath(id, pdfPath) {
   return findById(id);
 }
 
+// Only a draft becomes "sent": emailing a paid invoice again must not undo the payment
 export async function markSent(id) {
   await query(
-    `UPDATE proforma_invoices SET status = 'sent', sent_at = now(), updated_date = now() WHERE id = $1`,
+    `UPDATE proforma_invoices
+        SET status = CASE WHEN status = 'draft' THEN 'sent' ELSE status END,
+            sent_at = now(), updated_date = now()
+      WHERE id = $1`,
     [id]
   );
   return findById(id);

@@ -85,7 +85,7 @@ export async function getPdf(id, user) {
 export async function share(id, user) {
   const quotation = await getById(id, user);
   if (!quotation.pdfPath) throw ApiError.badRequest("Generate the PDF before sharing.");
-  if (quotation.status === "superseded") throw ApiError.badRequest("This version has been replaced by a newer one.");
+  // if (quotation.status === "superseded") throw ApiError.badRequest("This version has been replaced by a newer one.");
 
   const lead = await leadRepo.findById(quotation.leadId);
   const context = await quotationRepo.findContext(quotation.leadId);

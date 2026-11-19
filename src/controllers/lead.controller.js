@@ -27,6 +27,7 @@ export const getOne = asyncHandler(async (req, res) => {
 });
 
 export const create = asyncHandler(async (req, res) => {
+  
   sendCreated(res, await leadService.create(req.body, req.user), "Lead created successfully");
 });
 

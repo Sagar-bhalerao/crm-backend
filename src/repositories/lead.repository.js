@@ -181,14 +181,14 @@ export async function insert(data) {
       `INSERT INTO leads
          (lead_code, brand_id, location_id, first_name, last_name, mobile, email,
           lead_type, source, event_date, event_time_slot, guests, kids, requirements, remarks,
-          company_name, company_gstin, status, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+          company_name, company_gstin, status, created_by, destination)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
        RETURNING id`,
       [
         leadCode, data.brandId, data.locationId, data.firstName, data.lastName, data.mobile, data.email,
         data.leadType, data.source, data.eventDate, data.eventTimeSlot, data.guests, data.kids,
         data.requirements, data.remarks, data.companyName, data.companyGstin,
-        data.status, data.createdBy,
+        data.status, data.createdBy, data.destination,
       ]
     );
 

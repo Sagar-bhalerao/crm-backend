@@ -33,6 +33,7 @@ apiV1.use("/roles", roleRoutes);
 apiV1.use("/permissions", permissionRoutes);
 apiV1.use("/messaging", messagingRoutes);
 apiV1.use("/leads", leadRoutes);
+apiV1.use("/enquiries", publicLeadRoutes);
 apiV1.use("/rate-cards", rateCardRoutes);
 apiV1.use("/quotations", quotationRoutes);
 apiV1.use("/invoices", invoiceRoutes);

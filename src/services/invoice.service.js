@@ -35,16 +35,21 @@ export async function getById(id, user) {
   return invoice;
 }
 
-/** Copies the current quotation into a draft invoice, then makes its PDF. */
+/**
+ * Copies a quotation into a new draft invoice, then makes its PDF. Any
+ * version of the quotation can be used. An invoice already in play becomes
+ * superseded, the same way quotation versions work, unless its advance is
+ * already recorded.
+ */
 export async function create(leadId, data, user) {
   const lead = await leadService.getById(leadId, user);
   if (["finalized", "cancelled"].includes(lead.status)) {
     throw ApiError.badRequest("This lead is closed, so a proforma invoice cannot be issued.");
   }
 
-  const open = await invoiceRepo.findActive(lead.id);
-  if (open) {
-    throw ApiError.conflict(`${open.invoiceNumber} is already open for this lead. Cancel it before issuing a new one.`);
+  const current = await invoiceRepo.findActive(lead.id);
+  if (current?.status === "paid") {
+    throw ApiError.conflict(`The advance is already recorded on ${current.invoiceNumber}, so it can't be replaced.`);
   }
 
   const quotation = data.quotationId
@@ -53,11 +58,6 @@ export async function create(leadId, data, user) {
 
   if (!quotation || quotation.leadId !== lead.id) {
     throw ApiError.badRequest("Create a quotation for this lead first.");
-  }
-  // Drafts are allowed on purpose: a customer with no email address can
-  // never have their quotation "shared", and they still need an invoice.
-  if (quotation.status === "superseded") {
-    throw ApiError.badRequest("That quotation version has been replaced. Invoice the current one.");
   }
 
   const advanceDue = data.advanceDue ?? 0;
@@ -81,13 +81,14 @@ export async function create(leadId, data, user) {
     );
   } catch (err) {
     // Two people pressed Create at once; the one-open-invoice index caught it
-    if (err.code === "23505") throw ApiError.conflict("An invoice is already open for this lead.");
+    if (err.code === "23505") throw ApiError.conflict("Someone else just created an invoice for this lead. Reload and try again.");
     throw err;
   }
 
+  const replaced = current ? `, replacing ${current.invoiceNumber}` : "";
   await leadRepo.addActivity(
     null, lead.id, "invoice",
-    `Proforma invoice ${invoice.invoiceNumber} created from ${quotation.quotationCode} v${quotation.version} (${rupees(invoice.total)})`,
+    `Proforma invoice ${invoice.invoiceNumber} created from ${quotation.quotationCode} v${quotation.version} (${rupees(invoice.total)})${replaced}`,
     user.id
   );
 
@@ -155,8 +156,12 @@ export async function getPdf(id, user) {
  */
 export async function send(id, user) {
   const invoice = await getById(id, user);
-  if (invoice.status === "cancelled") throw ApiError.badRequest("This invoice has been cancelled.");
-  if (invoice.status === "paid") throw ApiError.badRequest("The advance on this invoice has already been received.");
+  // Paid invoices can be sent again: customers ask for another copy
+  if (["cancelled", "superseded"].includes(invoice.status)) {
+    throw ApiError.badRequest(
+      invoice.status === "cancelled" ? "This invoice has been cancelled." : "This version has been replaced by a newer one."
+    );
+  }
   if (!invoice.pdfPath) throw ApiError.badRequest("Generate the PDF before sending.");
   if (invoice.advanceDue <= 0) throw ApiError.badRequest("Set the advance amount before sending the invoice.");
 
@@ -194,8 +199,9 @@ export async function send(id, user) {
  */
 export async function recordPayment(id, data, user) {
   const invoice = await getById(id, user);
-  if (invoice.status === "cancelled") throw ApiError.badRequest("This invoice has been cancelled.");
-  if (invoice.status === "paid") throw ApiError.badRequest("Payment has already been recorded on this invoice.");
+  if (["cancelled", "superseded"].includes(invoice.status)) {
+    throw ApiError.badRequest("Record the payment against the current version of the invoice.");
+  }
 
   if (data.advancePaid > invoice.total) {
     throw ApiError.badRequest(`The amount can't be more than the invoice total of ${rupees(invoice.total)}.`);
@@ -229,6 +235,7 @@ export async function recordPayment(id, data, user) {
 export async function cancel(id, reason, user) {
   const invoice = await getById(id, user);
   if (invoice.status === "cancelled") throw ApiError.badRequest("This invoice is already cancelled.");
+  if (invoice.status === "superseded") throw ApiError.badRequest("This version has already been replaced by a newer one.");
   if (invoice.status === "paid") {
     throw ApiError.badRequest("A paid invoice can't be cancelled, because the advance is recorded against it.");
   }
