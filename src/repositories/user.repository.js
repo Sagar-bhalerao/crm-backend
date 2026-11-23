@@ -2,8 +2,20 @@ import { query, withTransaction } from "../config/database.js";
 import { TABLES } from "../config/tables.js";
 import { parsePagination, parseSort } from "../utils/pagination.js";
 
-const SORTABLE = ["first_name", "last_name", "email", "status", "created_date", "updated_date", "status", "location_id", "role_id", "password_hash", "last_login_date", "brand_id"];
-
+// const SORTABLE = ["u.first_name", "u.last_name", "u.email", "u.status", "u.created_date", "u.updated_date", "u.status", "u.location_id", "u.role_id", "u.password_hash", "u.last_login_date", "u.brand_id"];
+const SORTABLE = {
+  first_name: "u.first_name",
+  last_name: "u.last_name",
+  email: "u.email",
+  status: "u.status",
+  created_date: "u.created_date",
+  updated_date: "u.updated_date",
+  location_id: "u.location_id",
+  role_id: "u.role_id",
+  password_hash: "u.password_hash",
+  last_login_date: "u.last_login_date",
+  brand_id: "u.brand_id",
+}
 const toUser = (row) => ({
   id: row.id,
   firstName: row.first_name,
@@ -38,7 +50,7 @@ const SELECT = () => `
     LEFT JOIN roles r ON r.id = u.role_id
     LEFT JOIN "brand" b ON b.id = u.brand_id`;
 
-export async function findAll({ search, status, roleId, brandId, locationId, sort, page, pageSize }) {
+export async function findAll({ search, status, roleId, brandId, locationId, roleCode, sort, page, pageSize }) {
   const { offset, ...paging } = parsePagination({ page, pageSize });
   const where = [];
   const params = [];
@@ -48,6 +60,7 @@ export async function findAll({ search, status, roleId, brandId, locationId, sor
     where.push(`(u.first_name ILIKE $${params.length} OR u.last_name ILIKE $${params.length}
                  OR u.email ILIKE $${params.length} OR u.mobile ILIKE $${params.length})`);
   }
+
   if (status !== undefined) {
     params.push(status);
     where.push(`u.status = $${params.length}`);
@@ -65,22 +78,27 @@ export async function findAll({ search, status, roleId, brandId, locationId, sor
     where.push(`EXISTS (SELECT 1 FROM user_locations ul
                          WHERE ul.user_id = u.id AND ul.location_id = $${params.length})`);
   }
+  if (roleCode) {
+    params.push(roleCode);
+    where.push(`r.id = $${params.length}`);
+  }
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
   const { rows: countRows } = await query(`SELECT count(*)::int AS total FROM users u ${whereSql}`, params);
-  // const { rows } = await query(
-  //   `${SELECT()} ${whereSql}
-  //   ORDER BY ${parseSort(sort, SORTABLE, "first_name")}
-  //   LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
-  //   [...params, paging.pageSize, offset]
-  // );
+  
   const { rows } = await query(
-    `${SELECT()} ${whereSql}     
+    `${SELECT()} ${whereSql}
+    ORDER BY ${parseSort(sort, SORTABLE, "first_name")}
     LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
     [...params, paging.pageSize, offset]
   );
-  
-  
+  // const { rows } = await query(
+  //   `${SELECT()} ${whereSql}     
+  //   LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+  //   [...params, paging.pageSize, offset]
+  // );
+
+
   return { items: rows.map(toUser), total: countRows[0].total, ...paging };
 }
 
@@ -193,4 +211,24 @@ export async function findAuthUser(id) {
 
 export async function touchLastLogin(id) {
   await query(`UPDATE users SET last_login_date = now() WHERE id = $1`, [id]);
+}
+
+export async function getSalePocsBylocation(locationId) {
+  const { rows } = await query(
+    `SELECT u.id, u.first_name, u.last_name, u.email, u.mobile, u.status,
+            u.brand_id, u.role_id, u.location_id, u.created_date, u.updated_date, u.last_login_date,
+            r.name AS role_name, r.code AS role_code, b.brand_name AS brand_name,
+            COALESCE(
+              (SELECT json_agg(json_build_object('id', l.id, 'name', l.location_name) ORDER BY l.location_name)
+                  FROM user_locations ul
+                  JOIN "location" l ON l.id = ul.location_id
+                  WHERE ul.user_id = u.id), '[]') AS locations
+      FROM users u
+      LEFT JOIN roles r ON r.id = u.role_id
+      LEFT JOIN "brand" b ON b.id = u.brand_id  
+    WHERE u.role_id = (SELECT id FROM roles WHERE code = 'sale_poc' LIMIT 1)
+      AND EXISTS (SELECT 1 FROM user_locations ul WHERE ul.user_id = u.id AND ul.location_id = $1)`,
+    [locationId]
+  );
+  return rows.map(toUser);
 }

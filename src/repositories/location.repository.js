@@ -125,3 +125,26 @@ export async function remove(id) {
   const { rowCount } = await query(`DELETE FROM "location" WHERE id = $1`, [id]);
   return rowCount > 0;
 }
+
+/** Active locations of active brands, with their brand, for choosing where a lead belongs. */
+export async function findUsable({ brandId = null, ids = null } = {}) {
+  const params = [];
+  const where = [`l.status = 1`, `CAST(b.status AS text) = '1'`];
+  if (brandId) {
+    params.push(brandId);
+    where.push(`l.brand_id = $${params.length}`);
+  }
+  if (ids) {
+    params.push(ids);
+    where.push(`l.id = ANY($${params.length}::int[])`);
+  }
+  const { rows } = await query(
+    `SELECT l.id, l.location_name, l.brand_id, b.brand_name
+       FROM "location" l
+       JOIN "brand" b ON b.id = l.brand_id
+      WHERE ${where.join(" AND ")}
+      ORDER BY b.brand_name, l.location_name`,
+    params
+  );
+  return rows.map((r) => ({ id: r.id, name: r.location_name, brandId: r.brand_id, brandName: r.brand_name }));
+}

@@ -7,6 +7,10 @@ export const list = asyncHandler(async (req, res) => {
   sendOk(res, listPayload(items, meta), "Users loaded");
 });
 
+export const getSalePocsByLocation = asyncHandler(async (req, res) => {
+  
+  sendOk(res, await userService.getSalePocsByLocation(req.params.locationId), "Sale POCs loaded");
+});
 export const getOne = asyncHandler(async (req, res) => {
   sendOk(res, await userService.getById(req.params.id), "User loaded");
 });

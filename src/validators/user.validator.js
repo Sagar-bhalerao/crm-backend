@@ -42,4 +42,5 @@ export const listUsersSchema = z.object({
 
 export const passwordSchema = z.object({ password });
 export const userIdParam = idParam;
+export const locationIdParam = z.object({ locationId: z.coerce.number().int().positive("Invalid location id") });
 export const userStatusSchema = statusBody;

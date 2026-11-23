@@ -4,11 +4,19 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { listPayload, sendCreated, sendOk } from "../utils/response.js";
 import * as dashboardService from "../services/dashboard.service.js";
 
-/** Dropdown values for the lead screens. */
+/** Dropdown values for the lead screens, including the locations this user may use. */
 export const options = asyncHandler(async (req, res) => {
   sendOk(
     res,
-    { statuses: LEAD_STATUSES, types: LEAD_TYPES, sources: LEAD_SOURCES, timeSlots: TIME_SLOTS, followupChannels: FOLLOWUP_CHANNELS, followupOutcomes: FOLLOWUP_OUTCOMES },
+    {
+      statuses: LEAD_STATUSES,
+      types: LEAD_TYPES,
+      sources: LEAD_SOURCES,
+      timeSlots: TIME_SLOTS,
+      followupChannels: FOLLOWUP_CHANNELS,
+      followupOutcomes: FOLLOWUP_OUTCOMES,
+      locations: await leadService.usableLocations(req.user),
+    },
     "Options loaded"
   );
 });
