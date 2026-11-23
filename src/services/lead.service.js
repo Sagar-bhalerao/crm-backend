@@ -17,6 +17,13 @@ export function scopeFor(user) {
   return { assignedTo: user.id };
 }
 
+/** Where this user may put a lead: every location of their brand, or the ones they cover. */
+export async function usableLocations(user) {
+  const scope = scopeFor(user);
+  if (scope.all) return locationRepo.findUsable({ brandId: scope.brandId });
+  return locationRepo.findUsable({ brandId: scope.brandId, ids: user.locationIds || [] });
+}
+
 export const list = (query, user) => leadRepo.findAll(query, scopeFor(user));
 export const listFollowups = (user) => leadRepo.findScheduledFollowups(scopeFor(user));
 
@@ -40,12 +47,19 @@ export async function create(input, user = null) {
   const location = await locationRepo.findById(input.locationId);
   if (!location) throw ApiError.badRequest("Choose a location that exists.");
   if (location.status !== 1) throw ApiError.badRequest(`${location.name} is inactive.`);
+  // Someone signed in can only add leads where they work; the website form has no user
+  if (user) {
+    const allowed = await usableLocations(user);
+    if (!allowed.some((l) => l.id === location.id)) {
+      throw ApiError.badRequest("You can only add leads for your own locations.");
+    }
+  }
 
   // only someone allowed to assign may set the while creating
   const mayAssign = user?.permissions.includes("lead.assign");
   const assignedTo = mayAssign && input.assignedTo ? input.assignedTo : null;
 
-  
+
   return leadRepo.insert({
     ...input,
     brandId: location.brandId,
@@ -64,7 +78,12 @@ export async function update(id, changes, user) {
   // Moving to another location changes the brand too
   if (changes.locationId && changes.locationId !== lead.locationId) {
     const location = await locationRepo.findById(changes.locationId);
+    const allowed = await usableLocations(user);
+    if (!allowed.some((l) => l.id === location.id)) {
+      throw ApiError.badRequest("You can only move a lead to one of your own locations.");
+    }
     if (!location) throw ApiError.badRequest("Choose a location that exists.");
+
     changes.brandId = location.brandId;
   }
 

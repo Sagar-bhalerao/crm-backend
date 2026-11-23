@@ -5,6 +5,10 @@ import { ApiError } from "../utils/ApiError.js";
 
 export const list = (query) => userRepo.findAll(query);
 
+export async function getSalePocsByLocation(locationId) {
+  return userRepo.getSalePocsBylocation(locationId);
+}
+
 export async function getById(id) {
   const user = await userRepo.findById(id);
   if (!user) throw ApiError.notFound("That user does not exist.");

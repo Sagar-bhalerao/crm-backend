@@ -3,7 +3,7 @@ import * as userController from "../controllers/user.controller.js";
 import { requirePermission } from "../middlewares/auth.middleware.js";
 import { validate } from "../middlewares/validation.middleware.js";
 import {
-  createUserSchema, listUsersSchema, passwordSchema,
+  createUserSchema, listUsersSchema, locationIdParam, passwordSchema,
   updateUserSchema, userIdParam, userStatusSchema,
 } from "../validators/user.validator.js";
 
@@ -11,10 +11,12 @@ export const userRoutes = Router();
 
 userRoutes.get("/", requirePermission("user.view"), validate({ query: listUsersSchema }), userController.list);
 
+
 userRoutes.get("/:id", requirePermission("user.view"), validate({ params: userIdParam }), userController.getOne);
 
 userRoutes.post("/", requirePermission("user.create"), validate({ body: createUserSchema }), userController.create);
 
+userRoutes.get("/sale-pocs/:locationId", requirePermission("user.view"), validate({ params: locationIdParam }), userController.getSalePocsByLocation);
 userRoutes.put(
   "/:id",
   requirePermission("user.update"),
